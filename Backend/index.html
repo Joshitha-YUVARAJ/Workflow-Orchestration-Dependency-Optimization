@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Workflow Tester</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { margin: 5px; padding: 8px; }
+        input { margin: 5px; padding: 5px; }
+        pre { background: #111; color: #0f0; padding: 10px; }
+    </style>
+</head>
+<body>
+
+<h2>🔐 Auth</h2>
+<input id="username" value="admin" placeholder="username">
+<input id="password" value="1234" type="password">
+<button onclick="register()">Register</button>
+<button onclick="login()">Login</button>
+
+<h2>🧠 Workflow</h2>
+<button onclick="createWorkflow()">Create</button>
+<button onclick="getWorkflows()">Get All</button>
+
+<h2>📌 Tasks</h2>
+<button onclick="createTask('AUTOMATED')">Add Automated</button>
+<button onclick="createTask('MANUAL')">Add Manual</button>
+<button onclick="getTasks()">Get Tasks</button>
+
+<h2>🔗 Dependency</h2>
+<button onclick="addDependency()">Link Last Two Tasks</button>
+
+<h2>⚙️ Execution</h2>
+<button onclick="executeWorkflow()">Execute</button>
+<button onclick="getWaiting()">Waiting Tasks</button>
+<button onclick="completeTask()">Complete Task</button>
+
+<h3>📊 Output</h3>
+<pre id="out"></pre>
+
+<script>
+    const base = "http://localhost:8080"
+    let token = localStorage.getItem("token") || ""
+    let workflowId = null
+    let tasks = []
+    let workflowRunId = null
+    let taskRunId = null
+
+    function log(data) {
+      document.getElementById("out").innerText =
+        typeof data === "string" ? data : JSON.stringify(data, null, 2)
+    }
+
+    function headers() {
+      return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      }
+    }
+
+    async function register() {
+      let res = await fetch(base + "/api/auth/register", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          username: username.value,
+          password: password.value,
+          role: "ADMIN"
+        })
+      })
+      log(await res.text())
+    }
+
+    async function login() {
+      let res = await fetch(base + "/api/auth/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          username: username.value,
+          password: password.value
+        })
+      })
+      let data = await res.json()
+      token = data.token
+      localStorage.setItem("token", token)
+      log(data)
+    }
+
+    async function createWorkflow() {
+      let res = await fetch(base + "/api/workflows", {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          name: "UI Workflow",
+          description: "from html"
+        })
+      })
+      let data = await res.json()
+      workflowId = data.id
+      log(data)
+    }
+
+    async function getWorkflows() {
+      let res = await fetch(base + "/api/workflows", {
+        headers: headers()
+      })
+      log(await res.json())
+    }
+
+    async function createTask(type) {
+      let res = await fetch(`${base}/api/workflows/${workflowId}/tasks`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          name: "Task " + (tasks.length + 1),
+          description: "test",
+          estimatedDuration: 5,
+          taskType: type
+        })
+      })
+      let data = await res.json()
+      tasks.push(data.id)
+      log(data)
+    }
+
+    async function getTasks() {
+      let res = await fetch(`${base}/api/workflows/${workflowId}/tasks`, {
+        headers: headers()
+      })
+      log(await res.json())
+    }
+
+    async function addDependency() {
+      if (tasks.length < 2) {
+        log("Need at least 2 tasks")
+        return
+      }
+
+      let res = await fetch(`${base}/api/workflows/${workflowId}/dependencies`, {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          sourceTaskId: tasks[tasks.length - 2],
+          targetTaskId: tasks[tasks.length - 1]
+        })
+      })
+      log(await res.json())
+    }
+
+    async function executeWorkflow() {
+      let res = await fetch(`${base}/api/workflows/${workflowId}/execute`, {
+        method: "POST",
+        headers: headers()
+      })
+      let data = await res.json()
+      workflowRunId = data.id
+      log(data)
+    }
+
+    async function getWaiting() {
+      let res = await fetch(`${base}/api/workflow-runs/${workflowRunId}/waiting-task`, {
+        headers: headers()
+      })
+      let data = await res.json()
+      if (data.length > 0) taskRunId = data[0].taskRunId
+      log(data)
+    }
+
+    async function completeTask() {
+      if (!taskRunId) {
+        log("No taskRunId found")
+        return
+      }
+
+      let res = await fetch(`${base}/api/task-runs/${taskRunId}/complete`, {
+        method: "PATCH",
+        headers: headers()
+      })
+      log(await res.json())
+    }
+</script>
+
+</body>
+</html>

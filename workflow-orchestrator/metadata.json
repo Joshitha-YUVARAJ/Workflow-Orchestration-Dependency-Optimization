@@ -1,0 +1,5 @@
+{
+  "name": "Workflow Orchestrator",
+  "description": "A frontend for managing and executing workflows, tasks, and dependencies.",
+  "requestFramePermissions": []
+}
